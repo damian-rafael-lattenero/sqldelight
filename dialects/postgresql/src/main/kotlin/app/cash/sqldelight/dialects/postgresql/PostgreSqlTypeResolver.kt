@@ -53,6 +53,7 @@ import com.alecstrong.sql.psi.core.psi.SqlStmt
 import com.alecstrong.sql.psi.core.psi.SqlTypeName
 import com.alecstrong.sql.psi.core.psi.SqlTypes
 import com.intellij.psi.PsiElement
+import com.intellij.psi.TokenType
 import com.intellij.psi.tree.TokenSet
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
@@ -309,13 +310,13 @@ open class PostgreSqlTypeResolver(private val parentResolver: TypeResolver) : Ty
     // (the ANSI resolver types CASE by its first THEN alone, overstating
     // nullability for this form; traverse's cross-model relevance needs it).
     if (expr is SqlCaseExpr) {
-      val children = expr.node.getChildren(null)
-      val elseIdx = children.indexOfFirst { it.elementType == SqlTypes.ELSE }
-      val elseIsNull = elseIdx >= 0 && children.getOrNull(elseIdx + 1)?.text == "NULL"
+      val nodes = expr.node.getChildren(null).filter { it.elementType != TokenType.WHITE_SPACE }
+      val elseIdx = nodes.indexOfFirst { it.elementType == SqlTypes.ELSE }
+      val elseIsNull = elseIdx >= 0 && nodes.getOrNull(elseIdx + 1)?.text == "NULL"
       if (elseIdx == -1 || elseIsNull) {
         // The THEN value is the child right after the THEN token.
-        val thenIdx = children.indexOfFirst { it.elementType == SqlTypes.THEN }
-        val thenExpr = children.getOrNull(thenIdx + 1)?.psi as? SqlExpr
+        val thenIdx = nodes.indexOfFirst { it.elementType == SqlTypes.THEN }
+        val thenExpr = nodes.getOrNull(thenIdx + 1)?.psi as? SqlExpr
         if (thenExpr != null) return resolvedType(thenExpr).asNullable()
       }
     }
