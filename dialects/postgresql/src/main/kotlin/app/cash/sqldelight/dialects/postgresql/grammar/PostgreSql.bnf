@@ -510,7 +510,7 @@ distinct_on_expr ::= DISTINCT ON LP {result_column} ( COMMA {result_column} ) * 
   implements = "com.alecstrong.sql.psi.core.psi.SqlCompositeElement"
 }
 
-select_stmt ::= SELECT ( distinct_on_expr | [ DISTINCT | ALL ] ) {result_column} ( COMMA {result_column} ) * [ FROM {join_clause} ] [ WHERE <<expr '-1'>> ] [{group_by}] [HAVING <<expr '-1'>>] | VALUES {values_expression} ( COMMA {values_expression} ) * {
+select_stmt ::= SELECT ( distinct_on_expr | [ DISTINCT | ALL ] ) {result_column} ( COMMA {result_column} ) * [ FROM {join_clause} ] [ WHERE <<expr '-1'>> ] [{group_by}] [HAVING <<expr '-1'>>] [ window_clause ] | VALUES {values_expression} ( COMMA {values_expression} ) * {
   extends = "com.alecstrong.sql.psi.core.psi.impl.SqlSelectStmtImpl"
   implements = "com.alecstrong.sql.psi.core.psi.SqlSelectStmt"
   override = true
@@ -624,6 +624,12 @@ pgvector_cosine_distance_expression ::= ( {bind_expr} | {literal_expr} | {cast_e
 
 base_window_name ::= id
 window_name ::= id
+
+window_clause ::= 'WINDOW' window_defn ( COMMA window_defn ) * {
+  // brain fork: Postgres's SELECT-level WINDOW clause (named windows shared
+  // by several OVER references). The OVER side already accepts window_name;
+  // this adds the defining clause.
+}
 
 window_defn ::= LP [ base_window_name ]
   [ PARTITION BY <<expr '-1'>> ( COMMA <<expr '-1'>> ) * ]
