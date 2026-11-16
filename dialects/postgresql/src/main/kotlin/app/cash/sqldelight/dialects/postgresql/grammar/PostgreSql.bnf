@@ -68,6 +68,8 @@
     "static com.alecstrong.sql.psi.core.psi.SqlTypes.LIKE"
     "static com.alecstrong.sql.psi.core.psi.SqlTypes.LIMIT"
     "static com.alecstrong.sql.psi.core.psi.SqlTypes.LP"
+    "static com.alecstrong.sql.psi.core.psi.SqlTypes.LTE"
+    "static com.alecstrong.sql.psi.core.psi.SqlTypes.GT"
     "static com.alecstrong.sql.psi.core.psi.SqlTypes.MATCH"
     "static com.alecstrong.sql.psi.core.psi.SqlTypes.MINUS"
     "static com.alecstrong.sql.psi.core.psi.SqlTypes.MULTIPLY"
@@ -591,7 +593,7 @@ compound_select_stmt ::= [ {with_clause} ] {select_stmt}  ( {compound_operator} 
   override = true
 }
 
-extension_expr ::= any_operator_expr | geometry_setsrid_function_stmt | geometry_point_function_stmt | json_object_agg_stmt | json_agg_stmt | plsql_trigger_var_expression | plsql_found_expression | is_json_expression | overlaps_operator_expression | range_operator_expression | extract_temporal_expression | double_colon_cast_operator_expression | array_value_expression | contains_operator_expression | at_time_zone_operator_expression | regex_match_operator_expression | match_operator_expression | json_function_stmt | array_agg_stmt| string_agg_stmt | json_expression | exists_operator_expression | boolean_not_expression | window_function_expr {
+extension_expr ::= any_operator_expr | geometry_setsrid_function_stmt | geometry_point_function_stmt | json_object_agg_stmt | json_agg_stmt | plsql_trigger_var_expression | plsql_found_expression | is_json_expression | overlaps_operator_expression | range_operator_expression | extract_temporal_expression | double_colon_cast_operator_expression | array_value_expression | contains_operator_expression | at_time_zone_operator_expression | regex_match_operator_expression | match_operator_expression | json_function_stmt | array_agg_stmt| string_agg_stmt | json_expression | exists_operator_expression | boolean_not_expression | aggregate_filter_expression | pgvector_cosine_distance_expression | window_function_expr {
   extends = "com.alecstrong.sql.psi.core.psi.impl.SqlExtensionExprImpl"
   implements = "com.alecstrong.sql.psi.core.psi.SqlExtensionExpr"
   override = true
@@ -600,6 +602,24 @@ extension_expr ::= any_operator_expr | geometry_setsrid_function_stmt | geometry
 window_function_expr ::= {function_expr}
   ( ['FILTER' LP WHERE <<expr '-1'>> RP] 'OVER' ( window_defn | window_name) | 'WITHIN' GROUP LP ORDER BY <<expr '-1'>> ( COMMA <<expr '-1'>> ) * RP ) {
   mixin = "app.cash.sqldelight.dialects.postgresql.grammar.mixins.WindowFunctionMixin"
+}
+
+aggregate_filter_expression ::= {function_expr} 'FILTER' LP WHERE <<expr '-1'>> RP {
+  mixin = "app.cash.sqldelight.dialects.postgresql.grammar.mixins.AggregateExpressionMixin"
+  // brain fork: an aggregate with a FILTER clause and NO window OVER — valid
+  // PostgreSQL that upstream rejects because window_function_expr demands
+  // OVER after FILTER. NOTE: keep comments INSIDE rule braces — the grammar
+  // composer parses rules line-by-line and standalone comments between rules
+  // corrupt the composed grammar.
+}
+
+pgvector_cosine_distance_expression ::= ( {bind_expr} | {literal_expr} | {cast_expr} | {function_expr} | {column_expr} ) LTE GT <<expr '-1'>> {
+  mixin = "app.cash.sqldelight.dialects.postgresql.grammar.mixins.PgVectorCosineDistanceExpressionMixin"
+  // brain fork: pgvector's cosine distance <=> — the shared core lexer has
+  // no <=> token, so the source a <=> b lexes as the sequence LTE GT (<= >)
+  // and this rule consumes exactly that; the rendered SQL keeps the
+  // original text byte-faithful. NO pin: the alternative must fail cleanly
+  // (full backtrack) so plain comparisons like ? <= ? still parse.
 }
 
 base_window_name ::= id

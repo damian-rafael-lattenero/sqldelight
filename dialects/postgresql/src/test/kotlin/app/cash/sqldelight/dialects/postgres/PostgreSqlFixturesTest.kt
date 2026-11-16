@@ -20,6 +20,11 @@ class PostgreSqlFixturesTest(name: String, fixtureRoot: File) : FixturesTest(nam
     "id TEXT GENERATED ALWAYS AS (2) UNIQUE NOT NULL" to "id TEXT GENERATED ALWAYS AS (2) STORED UNIQUE NOT NULL",
     "'(', ')', ',', '.', <binary like operator real>, BETWEEN or IN expected, got ','"
       to "'#-', '&&', '(', ')', ',', '.', '::', <binary like operator real>, <contains operator real>, <jsona binary operator real>, <jsonb boolean operator real>, <range boolean operator real>, <regex match operator real>, '??', '@@', AT, BETWEEN or IN expected, got ','",
+    // brain fork: the pgvector cosine alternative offers LTE at every
+    // expression position, so the expected-token lists of intentional-error
+    // fixtures gain '<='.
+    "'#-', '&&', '(', ')', ',', '.', '::', <binary like operator real>, <contains operator real>, <jsona binary operator real>, <jsonb boolean operator real>, <range boolean operator real>, <regex match operator real>, '??', '@@', AT, BETWEEN or IN expected, got ','"
+      to "'#-', '&&', '(', ')', ',', '.', '::', <=, <binary like operator real>, <contains operator real>, <jsona binary operator real>, <jsonb boolean operator real>, <range boolean operator real>, <regex match operator real>, '??', '@@', AT, BETWEEN or IN expected, got ','",
   )
 
   override fun setupDialect() {

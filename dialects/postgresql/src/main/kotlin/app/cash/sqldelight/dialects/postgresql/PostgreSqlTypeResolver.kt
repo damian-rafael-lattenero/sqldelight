@@ -181,6 +181,10 @@ open class PostgreSqlTypeResolver(private val parentResolver: TypeResolver) : Ty
     }
     "to_hex", "quote_literal", "quote_ident", "md5" -> IntermediateType(TEXT)
     "quote_nullable" -> IntermediateType(TEXT).asNullable()
+    // brain fork: math + FTS functions the retrieval laws use.
+    "power", "exp", "ln", "sqrt" -> IntermediateType(REAL)
+    "ts_rank_cd", "ts_rank" -> IntermediateType(REAL)
+    "websearch_to_tsquery", "to_tsquery", "plainto_tsquery", "phraseto_tsquery" -> IntermediateType(PostgreSqlType.TSQUERY)
     "date_trunc" -> encapsulatingType(exprList, TIMESTAMP_TIMEZONE, TIMESTAMP)
     "date_part" -> IntermediateType(REAL)
     "percentile_disc", "cume_dist", "percent_rank" -> IntermediateType(REAL).asNullable()
