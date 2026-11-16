@@ -1,0 +1,77 @@
+name: Publish the brain fork to Maven Central
+
+# M5 (agent-brain ADR-007): the fork's postgresql dialect is published under
+# io.github.damian-rafael-lattenero — the GitHub-verified namespace the kap
+# artifacts already use — so agent-brain can depend on Maven Central and drop
+# the vendored maven-layout copy at core/libs/maven.
+#
+# The SAME five repository secrets kap's release uses (Settings -> Secrets and
+# variables -> Actions):
+#   MAVEN_CENTRAL_USERNAME  central.sonatype.com user token name
+#   MAVEN_CENTRAL_PASSWORD  central.sonatype.com user token password
+#   SIGNING_KEY_ID          gpg key id
+#   SIGNING_PASSWORD        gpg key passphrase
+#   GPG_KEY_CONTENTS        armored private key
+#
+# Scoped to ONE module on purpose: the root project group is still upstream
+# app.cash.sqldelight — running the bare root task would try to publish other
+# modules we have no claim to.
+
+on:
+  workflow_dispatch:
+  release:
+    types: [released]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Pre-publish · not already on Central
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check the coordinates are free
+        run: |
+          VERSION=$(grep '^VERSION_NAME' dialects/postgresql/gradle.properties | sed 's/.*=//')
+          URL="https://repo1.maven.org/maven2/io/github/damian-rafael-lattenero/postgresql-dialect/${VERSION}/postgresql-dialect-${VERSION}.pom"
+          echo "Checking $URL"
+          if curl -sf "$URL" > /dev/null 2>&1; then
+            echo "::error::postgresql-dialect ${VERSION} already exists on Maven Central. Bump VERSION_NAME (brainN) before publishing."
+            exit 1
+          fi
+          echo "Not published yet (OK)."
+
+  test:
+    name: Pre-publish · fork fixtures
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: The dialect's own test suite (the fork patches are pinned here)
+        run: ./gradlew :dialects:postgresql:test --console=plain
+
+  publish:
+    name: Publish + release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Publish to Maven Central (portal, auto-release)
+        run: ./gradlew :dialects:postgresql:publishAndReleaseToMavenCentral --no-configuration-cache --console=plain
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_KEY_CONTENTS }}
