@@ -625,10 +625,10 @@ pgvector_cosine_distance_expression ::= ( {bind_expr} | {literal_expr} | {cast_e
 base_window_name ::= id
 window_name ::= id
 
-window_clause ::= 'WINDOW' window_defn ( COMMA window_defn ) * {
-  // brain fork: Postgres's SELECT-level WINDOW clause (named windows shared
-  // by several OVER references). The OVER side already accepts window_name;
-  // this adds the defining clause.
+window_clause ::= 'WINDOW' window_name 'AS' window_defn ( COMMA window_name 'AS' window_defn ) * {
+  // brain fork: Postgres's SELECT-level WINDOW clause — named windows shared
+  // by several OVER references (lag(id) OVER w). The OVER side already
+  // accepts window_name; this adds the defining clause.
 }
 
 window_defn ::= LP [ base_window_name ]
