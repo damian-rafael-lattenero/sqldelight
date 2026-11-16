@@ -44,6 +44,7 @@ import com.alecstrong.sql.psi.core.psi.SqlBinaryMultExpr
 import com.alecstrong.sql.psi.core.psi.SqlBinaryPipeExpr
 import com.alecstrong.sql.psi.core.psi.SqlColumnExpr
 import com.alecstrong.sql.psi.core.psi.SqlCreateTableStmt
+import com.alecstrong.sql.psi.core.psi.SqlCaseExpr
 import com.alecstrong.sql.psi.core.psi.SqlExpr
 import com.alecstrong.sql.psi.core.psi.SqlFunctionExpr
 import com.alecstrong.sql.psi.core.psi.SqlIsExpr
@@ -303,6 +304,19 @@ open class PostgreSqlTypeResolver(private val parentResolver: TypeResolver) : Ty
   }
 
   override fun resolvedType(expr: SqlExpr): IntermediateType {
+    // brain fork: a CASE with no ELSE, or with ELSE NULL, yields NULL on
+    // non-matching rows — nullable even when the THEN expression is not
+    // (the ANSI resolver types CASE by its first THEN alone, overstating
+    // nullability for this form; traverse's cross-model relevance needs it).
+    if (expr is SqlCaseExpr) {
+      val children = expr.node.getChildren(null)
+      val elseIdx = children.indexOfFirst { it.elementType == SqlTypes.ELSE }
+      val elseIsNull = elseIdx >= 0 && children.getOrNull(elseIdx + 1)?.text == "NULL"
+      if (elseIdx == -1 || elseIsNull) {
+        val thenType = children.firstOrNull { it.psi is SqlExpr }?.psi as? SqlExpr
+        if (thenType != null) return resolvedType(thenType).asNullable()
+      }
+    }
     return expr.postgreSqlType()
   }
 
