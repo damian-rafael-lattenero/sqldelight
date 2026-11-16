@@ -33,7 +33,9 @@ import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlExtensionEx
 import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlGeometryPointFunctionStmt
 import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlGeometrySetsridFunctionStmt
 import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlInsertStmt
+import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlAggregateFilterExpression
 import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlJsonExpression
+import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlPgvectorCosineDistanceExpression
 import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlTypeName
 import app.cash.sqldelight.dialects.postgresql.grammar.psi.PostgreSqlUpdateStmtLimited
 import com.alecstrong.sql.psi.core.psi.SqlBinaryAddExpr
@@ -337,6 +339,13 @@ open class PostgreSqlTypeResolver(private val parentResolver: TypeResolver) : Ty
   }
 
   private fun SqlExpr.postgreSqlType(): IntermediateType = when (this) {
+    // brain fork: pgvector's cosine distance resolves to double precision.
+    is PostgreSqlPgvectorCosineDistanceExpression -> IntermediateType(REAL)
+    // brain fork: an aggregate with FILTER types as its inner function.
+    is PostgreSqlAggregateFilterExpression -> {
+      val functionExpr = (this as PsiElement).children.filterIsInstance<SqlFunctionExpr>().single()
+      functionType(functionExpr) ?: IntermediateType(PostgreSqlType.INTEGER)
+    }
     is SqlIsExpr -> IntermediateType(BOOLEAN)
     is SqlBinaryExpr -> {
       if (node.findChildByType(binaryExprChildTypesResolvingToBool) != null) {
@@ -373,6 +382,16 @@ open class PostgreSqlTypeResolver(private val parentResolver: TypeResolver) : Ty
     }
     is PostgreSqlAtTimeZoneOperator -> IntermediateType(TEXT)
     is PostgreSqlExtensionExpr -> when {
+      // brain fork: pgvector cosine distance resolves to double precision.
+      pgvectorCosineDistanceExpression != null -> IntermediateType(REAL)
+
+      // brain fork: an aggregate with FILTER types as its inner function.
+      aggregateFilterExpression != null -> {
+        val functionExpr = (aggregateFilterExpression as PsiElement)
+          .children.filterIsInstance<SqlFunctionExpr>().single()
+        functionType(functionExpr) ?: IntermediateType(PostgreSqlType.INTEGER)
+      }
+
       jsonFunctionStmt != null || jsonAggStmt != null || jsonObjectAggStmt != null -> IntermediateType(PostgreSqlType.JSON)
 
       geometrySetsridFunctionStmt != null || geometryPointFunctionStmt != null -> IntermediateType(PostgreSqlType.GEOMETRY)
