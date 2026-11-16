@@ -313,8 +313,10 @@ open class PostgreSqlTypeResolver(private val parentResolver: TypeResolver) : Ty
       val elseIdx = children.indexOfFirst { it.elementType == SqlTypes.ELSE }
       val elseIsNull = elseIdx >= 0 && children.getOrNull(elseIdx + 1)?.text == "NULL"
       if (elseIdx == -1 || elseIsNull) {
-        val thenType = children.firstOrNull { it.psi is SqlExpr }?.psi as? SqlExpr
-        if (thenType != null) return resolvedType(thenType).asNullable()
+        // The THEN value is the child right after the THEN token.
+        val thenIdx = children.indexOfFirst { it.elementType == SqlTypes.THEN }
+        val thenExpr = children.getOrNull(thenIdx + 1)?.psi as? SqlExpr
+        if (thenExpr != null) return resolvedType(thenExpr).asNullable()
       }
     }
     return expr.postgreSqlType()
